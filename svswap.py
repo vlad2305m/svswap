@@ -142,6 +142,7 @@ def xml_find_one_child(
     if match is None:
         raise KeyError(f"Could not find a <{name}> in the {element.tag}")
     else:
+        debug(f'Found: {match.tag} {[e.tag for e in match]}')
         return match
 
 # Set parser configuration
@@ -189,48 +190,18 @@ except KeyError:
 
 debug('Drilling down to <Buildings>')
 try:
-    game_locations = xml_find_one_child(game_root, 'locations')
-    game_farm = xml_find_one_child(game_locations, 'GameLocation',
-        attrib=('{http://www.w3.org/2001/XMLSchema-instance}type', 'Farm'),
-    )
-    farm_buildings = xml_find_one_child(game_farm, 'buildings')
+    farmhands = xml_find_one_child(game_root, 'farmhands')
 except KeyError:
     exception('Could not drill down to buidings!')
     sys.exit(3)
-
-# Now we're at the <Buildings>, build a list of cabins.
-cabins: List[ElementTree._Element] = list()
-for child in farm_buildings:
-    # We should only have buildings
-    if child.tag != 'Building':
-        error('Found a non-Building in buildings!')
-        sys.exit(3)
-
-    # Look for an appropriate indoors
-    is_cabin = False
-    try:
-        indoors = xml_find_one_child(child, 'indoors',
-            attrib=('{http://www.w3.org/2001/XMLSchema-instance}type', 'Cabin')
-        )
-        is_cabin = True
-    except KeyError:
-        pass
-
-    # Is it a cabin?  If yes, add to the list!
-    if is_cabin:
-        cabins.append(child)
 
 # Look up who is in each cabin.
 debug('Checking cabin occupancy')
 farmhand_names: List[Union[str, None]] = list()
 i = 0
-while (i<len(cabins)):
-    child = cabins[i]
-    indoors = xml_find_one_child(child, 'indoors',
-            attrib=('{http://www.w3.org/2001/XMLSchema-instance}type', 'Cabin')
-        )
+while (i<len(farmhands)):
+    farmhand = farmhands[i]
     try:
-        farmhand = xml_find_one_child(indoors, 'farmhand')
         farmhand_name_val = xml_find_one_child(farmhand, 'name').text
         if farmhand_name_val is None:
             error('Found a farmhand with no name!')
@@ -246,47 +217,41 @@ while (i<len(cabins)):
 # SELECT PLAYER
 
 # Show the player and cabin occupant names
-print(f"Found {len(cabins)} cabins!")
+print(f"Found {len(farmhands)} farmhands!")
 print(f" Player: {player_name}")
 i = 0
 for farmhand_name in farmhand_names:
     i = i + 1
-    if farmhand is None:
+    if farmhand_name is None:
         continue
     else:
-        print(f"Cabin {i}: {farmhand_name}")
+        print(f"Farmhand {i}: {farmhand_name}")
 
 # Ask for a cabin number
-target_cabin: Optional[int] = None
-while target_cabin is None:
+target_farmhand_i: Optional[int] = None
+while target_farmhand_i is None:
     try:
         # Get the input and convert to int.
         # This can raise a KeyboardInterrupt or a ValueError.
-        target_cabin = int(input('Which cabin number would you like to swap? '))
+        target_farmhand_i = int(input('Which farmhand number would you like to swap? '))
 
         # Check for non-positive integets.
-        if target_cabin <= 0:
+        if target_farmhand_i <= 0:
             print('Please enter a positive number')
-            target_cabin = None
+            target_farmhand_i = None
             continue
 
         # Convert the target cabin to an array index
-        target_cabin = target_cabin - 1
-
-        # Get the target building (cabin) and indoors)
-        target_building = cabins[target_cabin]
-        target_indoors = xml_find_one_child(target_building, 'indoors',
-            attrib=('{http://www.w3.org/2001/XMLSchema-instance}type', 'Cabin')
-        )
+        target_farmhand_i = target_farmhand_i - 1
 
         # Pull the target farmhand name and farmhand.  This can raise an IndexError.
-        target_farmhand_name = farmhand_names[target_cabin]
-        target_farmhand = xml_find_one_child(target_indoors, 'farmhand')
+        target_farmhand_name = farmhand_names[target_farmhand_i]
+        target_farmhand = farmhands[target_farmhand_i]
 
         # Check if the targeted farmhand exists.
         if target_farmhand_name is None:
             print('That cabin is empty.  You must select an occupied cabin.')
-            target_cabin = None
+            target_farmhand_i = None
 
         # That's all the validation!
     except KeyboardInterrupt:
@@ -294,10 +259,10 @@ while target_cabin is None:
         sys.exit(0)
     except ValueError:
         print('Please enter a number.')
-        target_cabin = None
+        target_farmhand_i = None
     except IndexError:
         print('Please enter a valid cabin number.')
-        target_cabin = None
+        target_farmhand_i = None
 
 # Cabin selected!
 # game_root (Element) is the root element, which contains a player
@@ -343,12 +308,12 @@ if do_continue == False:
 # * Remove the farmhand (target_farmhand) from the target indoors (target_indoors)
 debug('Step: Remove player and farmhand')
 game_root.remove(player)
-target_indoors.remove(target_farmhand)
+farmhands.remove(target_farmhand)
 
 # * Rename the current player (player) from "<player>" to "<farmhand>"
 # * Rename the current farmhand (target_farmhand) from "<farmhand>" to "<player>"
 debug('Step: Change tags')
-player.tag = 'farmhand'
+player.tag = 'Farmer'
 target_farmhand.tag = 'player'
 
 # * Swap the text of the current player (player) <homeLocation>
@@ -371,7 +336,7 @@ target_farmhand_homelocation.text = player_homelocation_text
 # * Add the old player (player) to the target indoors (target_indoors), at the end.
 # * Add the new player (target_farmhand) to the root element, at the start
 debug('Step: Insert back into tree')
-target_indoors.append(player)
+farmhands.append(player)
 game_root.insert(0, target_farmhand)
 
 # WRITE XML
