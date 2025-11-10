@@ -20,12 +20,12 @@ cannot say that it will work fine for you.
 
 ## Requirements
 
-* Stardew Valley 1.5
+* Stardew Valley 1.6
 
-  This code was developed against Stardew Valley 1.5.  If you last saved your
+  This code was developed against Stardew Valley 1.6.  If you last saved your
   game in an earlier version of Stardew Valley, the **current player** should
-  upgrade to 1.5, then load and save the game (by sleeping).  Once the game has
-  been saved with Stardew Valley 1.5, you can run this program.
+  upgrade to 1.6, then load and save the game (by sleeping).  Once the game has
+  been saved with Stardew Valley 1.6, you can run this program.
 
 * Python 3.8 or later
 
